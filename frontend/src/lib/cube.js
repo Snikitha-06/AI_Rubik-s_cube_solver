@@ -40,8 +40,12 @@ export function createEmptyState(N = 3) {
   // Initialize state with size metadata
   const state = { size: N };
   // Assign each face gray stickers filled to size N*N
-  FACE_NAMES.forEach(face => {
+  FACE_NAMES.forEach((face, i) => {
     state[face] = Array(N * N).fill('gray');
+    if (N % 2 === 1) {
+      const centerIdx = Math.floor((N * N) / 2);
+      state[face][centerIdx] = COLORS[i];
+    }
   });
   return state;
 }

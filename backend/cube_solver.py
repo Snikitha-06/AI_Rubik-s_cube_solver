@@ -169,6 +169,17 @@ def invert_move(move):
 # Main entry solver logic supporting NxN cubes
 def solve(state, N=3, history=None):
     """General NxN solver."""
+    # 0. Check if the cube is already solved
+    is_solved = True
+    for face in FACES:
+        if face in state and len(state[face]) > 0:
+            first_color = state[face][0]
+            if not all(c == first_color for c in state[face]):
+                is_solved = False
+                break
+    if is_solved:
+        return []
+
     # 1. If we have a move history (e.g., scramble sequence), solve by reverting moves in reverse order
     if history and len(history) > 0:
         return [invert_move(m) for m in reversed(history)]
@@ -179,10 +190,38 @@ def solve(state, N=3, history=None):
         mapping = {state[f][4]: f for f in FACES}
         k_str = ""
         # Construct the Kociemba representation string by visiting stickers of each face in U-R-F-D-L-B order
-        for f in FACES:
-            for s in state[f]: k_str += mapping[s]
-        # Run Kociemba algorithm and split the resulting string into a list of moves
-        return kociemba.solve(k_str).split()
+        try:
+            for f in FACES:
+                for s in state[f]: k_str += mapping[s]
+        except KeyError:
+            raise ValueError("Invalid coloring: Some sticker colors do not match any face center color.")
+
+        try:
+            # Run Kociemba algorithm and split the resulting string into a list of moves
+            return kociemba.solve(k_str).split()
+        except ValueError as e:
+            # Fallback to pure-Python validation solver to extract detailed error messages
+            from kociemba.pykociemba import search
+            try:
+                res = search.Search().solution(k_str, 24, 1000, False).strip()
+                errors = {
+                    'Error 1': 'There is not exactly 9 facelets of each color.',
+                    'Error 2': 'Not all 12 edges exist exactly once.',
+                    'Error 3': 'Flip error: One edge has to be flipped.',
+                    'Error 4': 'Not all 8 corners exist exactly once.',
+                    'Error 5': 'Twist error: One corner has to be twisted.',
+                    'Error 6': 'Parity error: Two corners or two edges have to be exchanged.',
+                    'Error 7': 'No solution exists for the given maxDepth.',
+                    'Error 8': 'Timeout, no solution found.'
+                }
+                if res in errors:
+                    raise ValueError(errors[res])
+                else:
+                    return res.split()
+            except Exception as py_err:
+                if isinstance(py_err, ValueError):
+                    raise py_err
+                raise ValueError("Error. Probably cubestring is invalid.")
     
     # 3. Fallback for larger NxN manual inputs: generate a reduction sequence
     # For large cubes, we generate a random sequence to demonstrate how inner layer moves are written.
@@ -195,6 +234,68 @@ def solve(state, N=3, history=None):
         res.append(f"{l if l>1 else ''}{f}")
         res.append(f"{l if l>1 else ''}{f}'")
     return res if res else ["U", "D", "L", "R", "F", "B"]
+
+# Helper to validate center sticker colors and relative 3D coordinate chirality
+def _validate_centers_chirality(state, N):
+    face_vectors = {
+        'U': (0, 1, 0),
+        'D': (0, -1, 0),
+        'R': (1, 0, 0),
+        'L': (-1, 0, 0),
+        'F': (0, 0, 1),
+        'B': (0, 0, -1)
+    }
+    center_idx = (N * N) // 2
+    centers = {}
+    for f in FACES:
+        if len(state[f]) <= center_idx:
+            return False, f"Invalid state: {f} face is too small."
+        centers[f] = state[f][center_idx]
+        
+    center_colors = list(centers.values())
+    
+    # 1. Uniqueness check
+    if len(set(center_colors)) < 6:
+        return False, "Invalid centers: Center stickers must have unique colors."
+        
+    # 2. Check if all standard colors are present
+    for color in COLORS:
+        if color not in center_colors:
+            return False, f"Invalid centers: Missing center color '{color}'."
+
+    # Map color to its unit vector
+    color_vectors = {}
+    for face, color in centers.items():
+        color_vectors[color] = face_vectors[face]
+
+    # Standard opposites check
+    opposites_map = {
+        'white': 'yellow', 'yellow': 'white',
+        'red': 'orange', 'orange': 'red',
+        'green': 'blue', 'blue': 'green'
+    }
+    for c1, c2 in opposites_map.items():
+        v1 = color_vectors[c1]
+        v2 = color_vectors[c2]
+        dot_product = sum(v1[i] * v2[i] for i in range(3))
+        if dot_product != -1:
+            return False, f"Invalid centers: {c1.capitalize()} and {c2.capitalize()} centers must be on opposite faces."
+
+    # Right-handedness check (Up x Front = Right)
+    v_white = color_vectors['white']
+    v_green = color_vectors['green']
+    v_red = color_vectors['red']
+    
+    cross_product = (
+        v_white[1] * v_green[2] - v_white[2] * v_green[1],
+        v_white[2] * v_green[0] - v_white[0] * v_green[2],
+        v_white[0] * v_green[1] - v_white[1] * v_green[0]
+    )
+    
+    if cross_product != v_red:
+        return False, "Invalid centers: Center colors form a left-handed (mirrored) layout. Check center orientations."
+
+    return True, "Valid"
 
 # Validate the counts of sticker colors in the current cube state
 def validate_state(state):
@@ -215,4 +316,11 @@ def validate_state(state):
         if c_count != N * N: details['errors'].append(f"{color}: {c_count}/{N*N}")
     # Return validation outcome
     if details['errors']: return False, "Mismatch: " + ", ".join(details['errors']), details
+    
+    # Check center uniqueness and chirality for odd-sized cubes
+    if N % 2 == 1:
+        valid_centers, centers_msg = _validate_centers_chirality(state, N)
+        if not valid_centers:
+            return False, centers_msg, details
+            
     return True, "Valid", details

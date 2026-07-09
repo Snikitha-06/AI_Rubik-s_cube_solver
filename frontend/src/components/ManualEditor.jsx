@@ -116,6 +116,10 @@ export default function ManualEditor({ cubeState, onStateChange }) {
 
   // Triggered when a grid sticker is clicked: updates color of that single sticker
   const handleStickerClick = (face, idx) => {
+    // Prevent modifying the center sticker on odd-sized cubes
+    if (size % 2 === 1 && idx === Math.floor((size * size) / 2)) {
+      return;
+    }
     // Clone the cube state dictionary
     const newState = { ...cubeState };
     // Clone the specific face stickers array to update in place
@@ -126,17 +130,31 @@ export default function ManualEditor({ cubeState, onStateChange }) {
     onStateChange(newState);
   };
 
-  // Paint all stickers of the currently active face with the selected color
+  // Paint all stickers of the currently active face with the selected color (keeping center color)
   const fillFace = () => {
     const newState = { ...cubeState };
-    newState[activeFace] = Array(size * size).fill(selectedColor);
+    if (size % 2 === 1) {
+      const centerIdx = Math.floor((size * size) / 2);
+      const centerColor = newState[activeFace][centerIdx];
+      newState[activeFace] = Array(size * size).fill(selectedColor);
+      newState[activeFace][centerIdx] = centerColor;
+    } else {
+      newState[activeFace] = Array(size * size).fill(selectedColor);
+    }
     onStateChange(newState);
   };
 
-  // Clear all stickers of the currently active face to gray (unset)
+  // Clear all stickers of the currently active face to gray (keeping center color)
   const clearFace = () => {
     const newState = { ...cubeState };
-    newState[activeFace] = Array(size * size).fill('gray');
+    if (size % 2 === 1) {
+      const centerIdx = Math.floor((size * size) / 2);
+      const centerColor = newState[activeFace][centerIdx];
+      newState[activeFace] = Array(size * size).fill('gray');
+      newState[activeFace][centerIdx] = centerColor;
+    } else {
+      newState[activeFace] = Array(size * size).fill('gray');
+    }
     onStateChange(newState);
   };
 
@@ -174,14 +192,23 @@ export default function ManualEditor({ cubeState, onStateChange }) {
       {/* Render active face grid details and click targets */}
       <div style={styles.label}>Face: {activeFace} ({size}x{size})</div>
       <div style={styles.faceGrid(size)}>
-        {cubeState[activeFace]?.map((color, idx) => (
-          <div
-            key={idx}
-            style={styles.sticker(color, size)}
-            onClick={() => handleStickerClick(activeFace, idx)}
-            title={`Click to set ${selectedColor}`}
-          />
-        ))}
+        {cubeState[activeFace]?.map((color, idx) => {
+          const isCenter = size % 2 === 1 && idx === Math.floor((size * size) / 2);
+          return (
+            <div
+              key={idx}
+              style={{
+                ...styles.sticker(color, size),
+                cursor: isCenter ? 'not-allowed' : 'pointer',
+                opacity: isCenter ? 0.8 : 1,
+                border: isCenter ? '2.5px dashed rgba(255,255,255,0.7)' : styles.sticker(color, size).border,
+                boxShadow: isCenter ? 'inset 0 0 8px rgba(0,0,0,0.5)' : 'none',
+              }}
+              onClick={() => !isCenter && handleStickerClick(activeFace, idx)}
+              title={isCenter ? `Center sticker (${color}) - Fixed` : `Click to set ${selectedColor}`}
+            />
+          );
+        })}
       </div>
 
       {/* Render shortcuts for bulk-filling or clearing faces */}
