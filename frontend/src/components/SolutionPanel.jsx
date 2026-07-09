@@ -1,5 +1,4 @@
-
-
+// Mapping of standard Rubik's Cube moves notation to user-friendly readable descriptions
 const MOVE_DESCRIPTIONS = {
   U: "Turn the TOP face clockwise",
   "U'": "Turn the TOP face counter-clockwise",
@@ -16,16 +15,19 @@ const MOVE_DESCRIPTIONS = {
   F: "Turn the FRONT face clockwise",
   "F'": "Turn the FRONT face counter-clockwise",
   F2: "Turn the FRONT face 180°",
+  Move_B: "Turn the BACK face clockwise", // Placeholder key description representation
   B: "Turn the BACK face clockwise",
   "B'": "Turn the BACK face counter-clockwise",
   B2: "Turn the BACK face 180°",
 };
 
+// Colors associated with the main faces of the moves (e.g. U is White, D is Yellow)
 const MOVE_FACE_COLORS = {
   U: '#f0f0f0', D: '#ffd93d', R: '#ff3b3b',
   L: '#ff8c00', F: '#00c853', B: '#2979ff',
 };
 
+// CSS styles configuration
 const styles = {
   container: { padding: '4px 0' },
   header: {
@@ -45,7 +47,7 @@ const styles = {
     width: `${pct}%`, height: '100%', background: 'var(--accent-gradient)',
     borderRadius: '2px', transition: 'width 200ms ease',
   }),
-  /* Current move highlight box */
+  /* Current move highlight box styles */
   currentMoveBox: {
     padding: '12px 16px', marginBottom: '12px',
     background: 'rgba(108,92,231,0.08)',
@@ -61,25 +63,29 @@ const styles = {
     fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px',
     fontWeight: '500',
   },
-  /* Steps list */
+  /* Steps list layout */
   stepsList: {
     maxHeight: '240px', overflowY: 'auto', marginBottom: '12px',
     borderRadius: 'var(--radius-md)',
     border: '1px solid var(--border-subtle)',
   },
+  // Styling for individual step row
   stepRow: (active) => ({
     display: 'flex', alignItems: 'center', gap: '10px',
     padding: '8px 12px', cursor: 'pointer',
     transition: 'all 150ms ease',
+    // Apply purple tint background if step is active
     background: active ? 'rgba(108,92,231,0.12)' : 'transparent',
     borderLeft: active ? '3px solid var(--accent-primary)' : '3px solid transparent',
     borderBottom: '1px solid var(--border-subtle)',
   }),
+  // Circle badge for step indexes
   stepNum: (active, done) => ({
     width: '24px', height: '24px', borderRadius: '50%',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: '11px', fontWeight: '700', fontFamily: 'var(--font-mono)',
     flexShrink: 0,
+    // Green background if step is done, purple if active, otherwise gray
     background: done ? '#00c853' : active ? 'var(--accent-primary)' : 'var(--bg-card)',
     color: done || active ? '#fff' : 'var(--text-muted)',
     border: `1px solid ${done ? '#00c853' : active ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
@@ -96,9 +102,11 @@ const styles = {
     background: color, flexShrink: 0,
     border: color === '#f0f0f0' ? '1px solid rgba(255,255,255,0.3)' : 'none',
   }),
+  // Playback control panel styling
   controls: {
     display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center',
   },
+  // Button styling generator
   btn: (variant) => ({
     padding: '8px 16px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
     border: variant === 'primary' ? 'none' : '1px solid var(--border-accent)',
@@ -106,17 +114,20 @@ const styles = {
     color: '#fff', fontFamily: 'var(--font-sans)', fontWeight: '600', fontSize: '13px',
     transition: 'all 200ms ease', display: 'flex', alignItems: 'center', gap: '4px',
   }),
+  // Playback speed slider controls
   speedControl: {
     display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', justifyContent: 'center',
   },
   speedLabel: { fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' },
   slider: { width: '100px', accentColor: 'var(--accent-primary)' },
+  // Empty layout state
   empty: {
     textAlign: 'center', padding: '30px 16px',
     color: 'var(--text-muted)', fontSize: '13px', lineHeight: '1.6',
   },
 };
 
+// Main SolutionPanel component
 export default function SolutionPanel({
   solution,
   currentStep = -1,
@@ -131,6 +142,7 @@ export default function SolutionPanel({
 }) {
   const moves = solution || [];
 
+  // Show welcome/empty text if solution array is empty
   if (!moves.length) {
     return (
       <div style={styles.empty}>
@@ -141,22 +153,27 @@ export default function SolutionPanel({
     );
   }
 
+  // Calculate percentage progress of completed moves
   const progress = moves.length > 0 ? ((currentStep + 1) / moves.length) * 100 : 0;
+  // Retrieve the move instruction corresponding to current step
   const currentMove = currentStep >= 0 && currentStep < moves.length ? moves[currentStep] : null;
+  // Retrieve face color corresponding to the active move
   const faceColor = currentMove ? MOVE_FACE_COLORS[currentMove[0]] || '#888' : null;
 
   return (
     <div style={styles.container}>
+      {/* Header and move counter */}
       <div style={styles.header}>
         <span style={styles.title}>Steps</span>
         <span style={styles.badge}>{moves.length} moves</span>
       </div>
 
+      {/* Progress Bar */}
       <div style={styles.progress}>
         <div style={styles.progressBar(progress)} />
       </div>
 
-      {/* Current move highlight */}
+      {/* Current active move highlight callout */}
       {currentMove && (
         <div style={styles.currentMoveBox}>
           <div style={{ ...styles.currentMoveNotation, color: faceColor }}>
@@ -174,7 +191,7 @@ export default function SolutionPanel({
         </div>
       )}
 
-      {/* Steps list */}
+      {/* Interactive steps list */}
       <div style={styles.stepsList}>
         {moves.map((move, i) => {
           const active = i === currentStep;
@@ -184,18 +201,22 @@ export default function SolutionPanel({
             <div
               key={i}
               style={styles.stepRow(active, done)}
-              onClick={() => onMoveHighlight?.(i)}
+              onClick={() => onMoveHighlight?.(i)} // Allow user to jump directly to any step
             >
+              {/* Checkmark icon if step is completed, otherwise step index */}
               <div style={styles.stepNum(active, done)}>
                 {done ? '✓' : i + 1}
               </div>
+              {/* Colored face dot representation */}
               <div style={styles.faceDot(fc)} />
+              {/* Move code (e.g. R2) */}
               <div style={{
                 ...styles.stepMove,
                 color: active ? 'var(--accent-primary)' : done ? '#00c853' : 'var(--text-primary)',
               }}>
                 {move}
               </div>
+              {/* User friendly description */}
               <div style={styles.stepDesc}>
                 {MOVE_DESCRIPTIONS[move] || ''}
               </div>
@@ -204,16 +225,18 @@ export default function SolutionPanel({
         })}
       </div>
 
-      {/* Playback controls */}
+      {/* Playback Control buttons */}
       <div style={styles.controls}>
-        <button style={styles.btn('secondary')} onClick={onReset} title="Reset">⏮</button>
-        <button style={styles.btn('secondary')} onClick={onStepBack} title="Previous">⏪</button>
+        <button style={styles.btn('secondary')} onClick={onReset} title="Reset">Reset (⏮)</button>
+        <button style={styles.btn('secondary')} onClick={onStepBack} title="Previous">Prev (⏪)</button>
+        {/* Play / Pause button */}
         <button style={styles.btn('primary')} onClick={onPlay}>
           {isPlaying ? '⏸ Pause' : '▶ Play'}
         </button>
-        <button style={styles.btn('secondary')} onClick={onStepForward} title="Next">⏩</button>
+        <button style={styles.btn('secondary')} onClick={onStepForward} title="Next">Next (⏩)</button>
       </div>
 
+      {/* Playback Speed slider */}
       <div style={styles.speedControl}>
         <span style={styles.speedLabel}>Speed</span>
         <input

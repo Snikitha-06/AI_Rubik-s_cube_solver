@@ -1,5 +1,7 @@
 /* eslint-disable no-unused-vars */
+// Import React hooks for lifecycle, references, and state values
 import { useEffect, useRef, useState } from 'react';
+// Import Framer Motion library to build smooth UI transitions and keyframe animations
 import { motion } from 'framer-motion';
 
 /**
@@ -8,41 +10,44 @@ import { motion } from 'framer-motion';
  * Material Design inspired with glowing effects
  */
 
+// Component to draw the custom curved/circular SVG arrow overlay representing the rotation direction
 function RotationArrow({ direction, isActive }) {
+  // Framer Motion configuration to animate arrow opacity and scale states
   const arrowVariants = {
     initial: { opacity: 0.4, scale: 0.9 },
     animate: { opacity: 1, scale: 1 },
     exit: { opacity: 0.4, scale: 0.9 },
   };
 
-  // Generate SVG arrow paths based on direction
+  // Define vector bezier curves and arrowhead structures for all directions
   const arrowPaths = {
     up: {
-      curve: 'M 50 100 Q 50 40 50 20',
+      curve: 'M 50 100 Q 50 40 50 20', // Upwards straight curve
       arrowHead: 'M 50 20 L 42 35 M 50 20 L 58 35',
     },
     down: {
-      curve: 'M 50 20 Q 50 80 50 100',
+      curve: 'M 50 20 Q 50 80 50 100', // Downwards straight curve
       arrowHead: 'M 50 100 L 42 85 M 50 100 L 58 85',
     },
     left: {
-      curve: 'M 100 50 Q 40 50 20 50',
+      curve: 'M 100 50 Q 40 50 20 50', // Leftwards straight curve
       arrowHead: 'M 20 50 L 35 42 M 20 50 L 35 58',
     },
     right: {
-      curve: 'M 20 50 Q 80 50 100 50',
+      curve: 'M 20 50 Q 80 50 100 50', // Rightwards straight curve
       arrowHead: 'M 100 50 L 85 42 M 100 50 L 85 58',
     },
     clockwise: {
-      curve: 'M 30 30 Q 70 10 80 40 Q 85 60 70 80 Q 30 90 20 70',
+      curve: 'M 30 30 Q 70 10 80 40 Q 85 60 70 80 Q 30 90 20 70', // Clockwise circular curve path
       arrowHead: 'M 20 70 L 28 65 M 20 70 L 18 78',
     },
     counterClockwise: {
-      curve: 'M 80 30 Q 30 10 20 40 Q 15 60 30 80 Q 70 90 80 70',
+      curve: 'M 80 30 Q 30 10 20 40 Q 15 60 30 80 Q 70 90 80 70', // Counter-clockwise circular curve path
       arrowHead: 'M 80 70 L 72 65 M 80 70 L 82 78',
     },
   };
 
+  // Retrieve curve configurations corresponding to current active direction
   const paths = arrowPaths[direction] || arrowPaths.right;
 
   return (
@@ -54,7 +59,7 @@ function RotationArrow({ direction, isActive }) {
       animate={isActive ? 'animate' : 'initial'}
       transition={{ duration: 0.5 }}
     >
-      {/* Glow effect */}
+      {/* SVG glow filter overlay to add neon shadow styling to the arrow curves */}
       <defs>
         <filter id={`glow-${direction}`} x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="2" result="coloredBlur" />
@@ -65,7 +70,7 @@ function RotationArrow({ direction, isActive }) {
         </filter>
       </defs>
 
-      {/* Main arrow curve */}
+      {/* Render curved arrow body */}
       <path
         d={paths.curve}
         stroke={isActive ? '#2563eb' : 'rgba(37, 99, 235, 0.4)'}
@@ -77,7 +82,7 @@ function RotationArrow({ direction, isActive }) {
         className={isActive ? 'drop-shadow-[0_0_8px_rgb(37,99,235)]' : ''}
       />
 
-      {/* Arrowhead */}
+      {/* Render arrowhead pointers */}
       <path
         d={paths.arrowHead}
         stroke={isActive ? '#2563eb' : 'rgba(37, 99, 235, 0.4)'}
@@ -91,7 +96,9 @@ function RotationArrow({ direction, isActive }) {
   );
 }
 
+// Component representing a face sticker grid sheet inside the 3D CSS model
 function CubeSticker({ face, isHighlighted, faceColors }) {
+  // Colors mapped to the standard Rubik's cube sides
   const colors = {
     front: 'bg-white',
     back: 'bg-green-700',
@@ -109,6 +116,7 @@ function CubeSticker({ face, isHighlighted, faceColors }) {
       whileHover={{ scale: 1.05 }}
       transition={{ duration: 0.3 }}
     >
+      {/* Draw a 3x3 layout of black cells representing stickers border divisions */}
       <div className="grid grid-cols-3 gap-1 p-2 h-full">
         {Array.from({ length: 9 }).map((_, i) => (
           <div key={i} className="bg-black/30 rounded" />
@@ -118,21 +126,23 @@ function CubeSticker({ face, isHighlighted, faceColors }) {
   );
 }
 
+// Component rendering a 3D Cube using pure CSS 3D transforms
 function Cube3DVisualization({ rotation, highlightedFace }) {
   return (
     <motion.div
       className="relative w-32 h-32 mx-auto"
-      style={{ perspective: '1000px' }}
+      style={{ perspective: '1000px' }} // Perspective depth to active CSS 3D transforms
       animate={{
+        // Dynamically rotate coordinate orientations from values computed in animation frame loops
         rotateX: rotation.x,
         rotateY: rotation.y,
         rotateZ: rotation.z,
       }}
       transition={{ type: 'spring', stiffness: 50, damping: 20 }}
     >
-      {/* Cube container with 3D effect */}
+      {/* Container holding standard CSS transformStyle: preserve-3d properties */}
       <div className="relative w-full h-full" style={{ transformStyle: 'preserve-3d' }}>
-        {/* Front face */}
+        {/* Front Face: translateZ shifts the face forward by half of cube width */}
         <div
           className="absolute w-20 h-20 bg-gradient-to-br from-white to-gray-100 rounded-lg border-2 border-white/30 shadow-xl"
           style={{
@@ -153,7 +163,7 @@ function Cube3DVisualization({ rotation, highlightedFace }) {
           </div>
         </div>
 
-        {/* Back face */}
+        {/* Back Face: rotates 180 degrees around Y axis and translates */}
         <div
           className="absolute w-20 h-20 bg-gradient-to-br from-green-600 to-green-700 rounded-lg border-2 border-green-300/30 shadow-xl"
           style={{
@@ -171,7 +181,7 @@ function Cube3DVisualization({ rotation, highlightedFace }) {
           </div>
         </div>
 
-        {/* Right face */}
+        {/* Right Face: rotates 90 degrees around Y axis and translates */}
         <div
           className="absolute w-20 h-20 bg-gradient-to-br from-red-500 to-red-600 rounded-lg border-2 border-red-300/30 shadow-xl"
           style={{
@@ -189,7 +199,7 @@ function Cube3DVisualization({ rotation, highlightedFace }) {
           </div>
         </div>
 
-        {/* Left face */}
+        {/* Left Face: rotates -90 degrees around Y axis and translates */}
         <div
           className="absolute w-20 h-20 bg-gradient-to-br from-blue-400 to-blue-500 rounded-lg border-2 border-blue-300/30 shadow-xl"
           style={{
@@ -207,7 +217,7 @@ function Cube3DVisualization({ rotation, highlightedFace }) {
           </div>
         </div>
 
-        {/* Top face */}
+        {/* Top Face: rotates 90 degrees around X axis and translates */}
         <div
           className="absolute w-20 h-20 bg-gradient-to-br from-yellow-200 to-yellow-300 rounded-lg border-2 border-yellow-300/30 shadow-xl"
           style={{
@@ -225,7 +235,7 @@ function Cube3DVisualization({ rotation, highlightedFace }) {
           </div>
         </div>
 
-        {/* Bottom face */}
+        {/* Bottom Face: rotates -90 degrees around X axis and translates */}
         <div
           className="absolute w-20 h-20 bg-gradient-to-br from-gray-200 to-gray-300 rounded-lg border-2 border-gray-300/30 shadow-xl"
           style={{
@@ -247,6 +257,7 @@ function Cube3DVisualization({ rotation, highlightedFace }) {
   );
 }
 
+// Main CubeRotationGuide component displaying 3D animations and arrows
 export default function CubeRotationGuide({
   direction = 'right',
   isAnimating = true,
@@ -255,8 +266,10 @@ export default function CubeRotationGuide({
   showInstructionCard = true,
   compact = false,
 }) {
+  // State hook keeping active 3D x-y-z Euler angle orientations
   const [rotation, setRotation] = useState({ x: 0, y: 0, z: 0 });
 
+  // Handle requestAnimationFrame loops to animate the visual guide
   useEffect(() => {
     if (!isAnimating) return;
 
@@ -264,9 +277,12 @@ export default function CubeRotationGuide({
     let time = 0;
 
     const animate = () => {
+      // Step animation clock
       time += 0.02;
+      // Calculate oscillation angle using sinusoids (swings +/- 25 degrees)
       const angle = Math.sin(time) * 25;
 
+      // Assign rotation to respective coordinate axis based on the direction prop
       setRotation(prev => {
         switch (direction) {
           case 'left':
@@ -286,13 +302,17 @@ export default function CubeRotationGuide({
         }
       });
 
+      // Recurse next animation cycle
       animationFrame = requestAnimationFrame(animate);
     };
 
+    // Begin render updates
     animationFrame = requestAnimationFrame(animate);
+    // Cleanup loop handle on destroy
     return () => cancelAnimationFrame(animationFrame);
   }, [direction, isAnimating]);
 
+  // Positions configurations for rendering overlays around the central visualizer
   const arrowPositions = {
     up: 'top-0 left-1/2 -translate-x-1/2',
     down: 'bottom-0 left-1/2 -translate-x-1/2',
@@ -302,15 +322,19 @@ export default function CubeRotationGuide({
     counterClockwise: 'top-0 left-0',
   };
 
+  // Render compact view layout (useful for overlays on camera scan page)
   if (compact) {
     return (
       <div className="flex flex-col items-center gap-3">
         <div className="relative w-40 h-40 bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl shadow-2xl flex items-center justify-center overflow-hidden">
+          {/* Positional arrow */}
           <div className={`absolute inset-0 ${arrowPositions[direction] || arrowPositions.right}`}>
             <RotationArrow direction={direction} isActive={isAnimating} />
           </div>
+          {/* Main 3D model */}
           <Cube3DVisualization rotation={rotation} highlightedFace={direction} />
         </div>
+        {/* Instruction label */}
         {showInstructionCard && (
           <div className="text-center">
             <p className="text-sm font-semibold text-white">{instruction}</p>
@@ -321,9 +345,10 @@ export default function CubeRotationGuide({
     );
   }
 
+  // Render standard full size layout with banners and control button grids
   return (
     <div className="w-full max-w-md mx-auto">
-      {/* Instruction Card */}
+      {/* Top Banner Card showing the current instructions */}
       {showInstructionCard && (
         <motion.div
           className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-4 mb-6 shadow-lg text-white"
@@ -341,22 +366,22 @@ export default function CubeRotationGuide({
         </motion.div>
       )}
 
-      {/* Main Visualization Area */}
+      {/* Visualizer Area */}
       <div className="relative bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl p-8 shadow-2xl">
-        {/* Background gradient effect */}
+        {/* Circular background radial glow element */}
         <div className="absolute inset-0 bg-gradient-radial from-blue-500/10 to-transparent rounded-3xl" />
 
-        {/* Cube with arrows */}
+        {/* 3D Cube Canvas box */}
         <div className="relative flex items-center justify-center h-64">
           <Cube3DVisualization rotation={rotation} highlightedFace={direction} />
 
-          {/* Arrow indicators positioned around cube */}
+          {/* Overlay Arrow indicators */}
           <div className={`absolute ${arrowPositions[direction] || arrowPositions.right}`}>
             <RotationArrow direction={direction} isActive={isAnimating} />
           </div>
         </div>
 
-        {/* Step indicator */}
+        {/* Animated pulse badge */}
         <motion.div
           className="absolute top-3 right-3 bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-semibold"
           animate={{ scale: isAnimating ? [1, 1.1, 1] : 1 }}
@@ -366,7 +391,7 @@ export default function CubeRotationGuide({
         </motion.div>
       </div>
 
-      {/* Direction indicators */}
+      {/* Button controls grid */}
       <div className="mt-6 grid grid-cols-3 gap-2">
         {['left', 'up', 'right', 'down', 'clockwise', 'counterClockwise'].slice(0, 3).map(dir => (
           <motion.button

@@ -1,9 +1,14 @@
+// Import standard React hooks for component lifecycle and DOM references
 import { useRef, useCallback, useState, useEffect, useMemo } from 'react';
+// Import Webcam component to capture stream snapshots
 import Webcam from 'react-webcam';
 
+// Default stroke color for the video overlay guidelines grid
 const GRID_COLOR = 'rgba(108, 92, 231, 0.7)';
+// API backend prefix URL
 const API_URL = '/api';
 
+// Map color keys to standard hexadecimal color strings
 const COLOR_HEX = {
   white: '#f0f0f0', red: '#ff3b3b', green: '#00c853',
   yellow: '#ffd93d', orange: '#ff8c00', blue: '#2979ff',
@@ -15,6 +20,7 @@ const COLOR_HEX = {
  */
 const FACE_ORDER = ['F', 'R', 'B', 'L', 'U', 'D'];
 
+// Instructions, labels, and rotation arrow configurations for all scanning steps
 const FACE_INFO = {
   F: {
     label: 'Front',
@@ -60,6 +66,7 @@ const FACE_INFO = {
   },
 };
 
+// Inline CSS styles configurations
 const styles = {
   wrapper: {
     position: 'relative',
@@ -125,7 +132,7 @@ const styles = {
     background: done ? '#00c853' : active ? 'var(--accent-primary)' : 'var(--bg-card)',
     border: `1px solid ${active ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
   }),
-  // Detected colors preview grid
+  // Detected colors preview grid container
   detectedGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, 1fr)',
@@ -145,9 +152,11 @@ const styles = {
   }),
 };
 
+// Component to render a 3D cube demonstrating rotation directions (Left, Right, Up, Down)
 function CaptureGuideCube({ rotationArrow, activeFace }) {
   const [phase, setPhase] = useState(0);
 
+  // requestAnimationFrame hook to update rotation phases dynamically
   useEffect(() => {
     if (!rotationArrow) return undefined;
 
@@ -188,6 +197,7 @@ function CaptureGuideCube({ rotationArrow, activeFace }) {
   let rotateX = 0;
   let rotateY = 0;
 
+  // Set rotation degrees depending on guide direction
   if (rotationArrow === 'left') {
     rotateY = p * -90; // Demonstrates rotating left Y-axis
   } else if (rotationArrow === 'right') {
@@ -209,6 +219,7 @@ function CaptureGuideCube({ rotationArrow, activeFace }) {
     bottom: '#ffd93d',
   };
 
+  // Generate 3D face styling configurations
   const faceStyle = (transform, bg) => ({
     position: 'absolute',
     inset: '0',
@@ -224,6 +235,7 @@ function CaptureGuideCube({ rotationArrow, activeFace }) {
     backfaceVisibility: 'hidden',
   });
 
+  // Render 3x3 layout of stickers inside each guide face
   const stickerGrid = (color) => (
     <div style={{
       position: 'absolute', inset: '4px', display: 'grid',
@@ -354,13 +366,15 @@ function GridOverlay({ width, height, faceInfo, detectedColors, size = 3 }) {
 
   return (
     <svg style={styles.overlay} viewBox={`0 0 ${width} ${height}`}>
-      {/* Grid */}
+      {/* Grid Border */}
       <rect x={x1} y={y1} width={x2 - x1} height={y2 - y1}
         fill="none" stroke={GRID_COLOR} strokeWidth="2" rx="6" />
+      {/* Vertical divider lines */}
       {innerLines.map(i => (
         <line key={`v${i}`} x1={x1 + cw * i} y1={y1} x2={x1 + cw * i} y2={y2}
           stroke={GRID_COLOR} strokeWidth="1.5" />
       ))}
+      {/* Horizontal divider lines */}
       {innerLines.map(i => (
         <line key={`h${i}`} x1={x1} y1={y1 + ch * i} x2={x2} y2={y1 + ch * i}
           stroke={GRID_COLOR} strokeWidth="1.5" />
@@ -458,9 +472,10 @@ function GridOverlay({ width, height, faceInfo, detectedColors, size = 3 }) {
 }
 
 /* ── Detected Colors Mini Preview ─────────── */
+// Component rendering a miniature grid reflecting the colors scanned/detected on the face
 function DetectedPreview({ colors, label, size = 3 }) {
   if (!colors) return null;
-  // Calculate cell size so the grid stays compact
+  // Calculate cell size dynamically so the grid preview stays compact
   const gridWidth = Math.min(180, size * 24);
   const cellSize = Math.max(12, Math.floor(gridWidth / size) - 3);
 
@@ -482,6 +497,7 @@ function DetectedPreview({ colors, label, size = 3 }) {
         maxWidth: `${gridWidth}px`,
         margin: '8px auto 0',
       }}>
+        {/* Render each detected sticker color swatch */}
         {colors.map((color, i) => (
           <div key={i} style={{
             width: `${cellSize}px`,
@@ -498,6 +514,7 @@ function DetectedPreview({ colors, label, size = 3 }) {
   );
 }
 
+// Main CameraCapture Component
 export default function CameraCapture({ 
   onFaceScanned, 
   size = 3,
@@ -511,12 +528,18 @@ export default function CameraCapture({
   onResetSolved
 }) {
   const webcamRef = useRef(null);
+  // State hook tracking which face is currently being scanned (defaults to Front)
   const [activeFace, setActiveFace] = useState('F');
+  // State hook tracking if scanner request is in flight
   const [scanning, setScanning] = useState(false);
+  // Set tracking which faces have been captured successfully
   const [scannedFaces, setScannedFaces] = useState(new Set());
+  // Map recording center colors of scanned faces to check orientation mapping
   const [scannedCenters, setScannedCenters] = useState({});
-  const [lastDetected, setLastDetected] = useState(null); // colors from last scan
+  // Colors detected from the most recent camera frame scan
+  const [lastDetected, setLastDetected] = useState(null); 
   const [lastDetectedFace, setLastDetectedFace] = useState(null);
+  // Status message string for instructions
   const [status, setStatus] = useState('Pick up the cube — point any face at the camera');
 
   const currentIdx = FACE_ORDER.indexOf(activeFace);
@@ -524,21 +547,25 @@ export default function CameraCapture({
   const info = FACE_INFO[activeFace];
   const nextInfo = nextFace ? FACE_INFO[nextFace] : null;
 
-  // Continuous polling loop in solve mode
+  // Continuous polling loop in solve mode to check if user has executed step correctly
   useEffect(() => {
+    // Return if not in solve mode, transitioning, or modal completed is shown
     if (mode !== 'solve' || isTransitioning || showSolvedAnimation) return;
 
     let active = true;
     let timer = null;
 
+    // Async function to grab screenshots and request classification
     const runDetection = async () => {
       if (!active) return;
       const webcam = webcamRef.current;
+      // Retry after delay if webcam is offline
       if (!webcam) {
         timer = setTimeout(runDetection, 300);
         return;
       }
 
+      // Grab base64 image representation from webcam stream
       const imageSrc = webcam.getScreenshot();
       if (!imageSrc) {
         timer = setTimeout(runDetection, 300);
@@ -547,7 +574,9 @@ export default function CameraCapture({
 
       setScanning(true);
       try {
+        // Strip base64 metadata header to extract raw data bytes
         const base64 = imageSrc.split(',')[1];
+        // Request color classification from Python API backend
         const res = await fetch(`${API_URL}/detect`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -555,6 +584,7 @@ export default function CameraCapture({
         });
         const data = await res.json();
         
+        // Pass detected colors to callback if response is successful
         if (active && !data.error && data.colors) {
           setLastDetected(data.colors);
           onColorsDetected?.(data.colors);
@@ -564,23 +594,27 @@ export default function CameraCapture({
       } finally {
         if (active) {
           setScanning(false);
-          timer = setTimeout(runDetection, 400); // Poll every 400ms
+          // Set next poll delay (400ms)
+          timer = setTimeout(runDetection, 400); 
         }
       }
     };
 
+    // Run first update
     runDetection();
 
+    // Clean up timer handles on unmount
     return () => {
       active = false;
       if (timer) clearTimeout(timer);
     };
   }, [mode, size, isTransitioning, showSolvedAnimation, onColorsDetected]);
 
-  // Determine affected faces for the current move to guide the user
+  // Determine affected faces for the current move to guide the user (e.g. U affects F, R, B, L)
   const changedFaces = useMemo(() => {
     if (!currentMove) return [];
     
+    // Parse notation parts
     const match = currentMove.match(/^(\d+)?([URFDLB])(w)?(['2])?$/);
     if (!match) return [];
     const [, layerStr, face, wide] = match;
@@ -610,15 +644,18 @@ export default function CameraCapture({
       B: 'Back (Blue)'
     };
     
+    // Convert face letters to readable names
     return Array.from(affected).map(f => faceNames[f] || f);
   }, [currentMove]);
 
+  // Visual header object configuration in solve mode
   const solveFaceInfo = {
     stepNumber: playbackStep + 2,
     label: `Solve: ${currentMove || ''}`,
     rotationArrow: null
   };
 
+  // Capture callback: runs when user clicks 'Capture Face' button in scanning mode
   const capture = useCallback(async () => {
     const webcam = webcamRef.current;
     if (!webcam) return;
@@ -627,6 +664,7 @@ export default function CameraCapture({
     setStatus('📸 Analyzing colours…');
 
     try {
+      // Get base64 frame data URL from video component
       const imageSrc = webcam.getScreenshot();
       if (!imageSrc) {
         setStatus('❌ Failed to capture — check camera permissions');
@@ -634,6 +672,7 @@ export default function CameraCapture({
         return;
       }
       const base64 = imageSrc.split(',')[1];
+      // Send BGR image to OpenCV Flask endpoint
       const res = await fetch(`${API_URL}/detect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -644,8 +683,9 @@ export default function CameraCapture({
       if (data.error) {
         setStatus(`❌ ${data.error}`);
       } else {
+        // Send colors layout array back to parent component
         onFaceScanned(activeFace, data.colors);
-        // Track what center color was detected
+        // Identify center sticker color (index computed from middle row/col)
         const centerIdx = Math.floor(size / 2) * size + Math.floor(size / 2);
         const centerColor = data.colors[centerIdx];
         setScannedCenters(prev => ({ ...prev, [activeFace]: centerColor }));
@@ -654,17 +694,18 @@ export default function CameraCapture({
         setLastDetectedFace(activeFace);
         setStatus(`✅ ${info.label} captured!${centerColor ? ` (center: ${centerColor})` : ''}`);
 
-        // Log debug info if available
+        // Debug outputs
         if (data.debug) {
           console.log(`[${activeFace}] HSV medians:`, data.debug.hsv_medians);
           console.log(`[${activeFace}] RGB medians:`, data.debug.rgb_medians);
         }
 
+        // Auto transition to next face in sequence after a short delay
         if (nextFace) {
           setTimeout(() => {
             setActiveFace(nextFace);
             setStatus(`Now: ${FACE_INFO[nextFace].rotation || 'ready'}`);
-          }, 1200); // slightly longer delay to let user see the preview
+          }, 1200);
         } else {
           setStatus('🎉 All 6 faces scanned! Hit Solve!');
         }
@@ -677,7 +718,7 @@ export default function CameraCapture({
 
   return (
     <div>
-      {/* Face selector */}
+      {/* Face tab selector buttons (Scan mode only) */}
       {mode === 'scan' && (
         <div style={styles.faceSelector}>
           {FACE_ORDER.map(f => {
@@ -755,6 +796,7 @@ export default function CameraCapture({
           )}
         </div>
       ) : (
+        // Playback guidance card
         <div style={styles.stepCard}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px',
@@ -795,7 +837,7 @@ export default function CameraCapture({
         </div>
       )}
 
-      {/* Webcam */}
+      {/* Webcam Viewport */}
       <div style={styles.wrapper}>
         <Webcam
           ref={webcamRef}
@@ -809,9 +851,11 @@ export default function CameraCapture({
             facingMode: 'environment',
           }}
         />
+        {/* Render 3D guide overlay cube in scanning mode */}
         {mode === 'scan' && (
           <CaptureGuideCube key={activeFace} rotationArrow={info.rotationArrow} activeFace={activeFace} />
         )}
+        {/* Render grid alignment overlay guidelines */}
         <GridOverlay
           width={480} height={480} faceInfo={mode === 'solve' ? solveFaceInfo : info}
           detectedColors={lastDetected}
@@ -819,7 +863,7 @@ export default function CameraCapture({
         />
       </div>
 
-      {/* Progress (Scan mode only) */}
+      {/* Progress Dots indicators (Scan mode only) */}
       {mode === 'scan' && (
         <div style={styles.progressRow}>
           {FACE_ORDER.map(f => (
@@ -830,9 +874,10 @@ export default function CameraCapture({
         </div>
       )}
 
+      {/* Scanned status text (Scan mode only) */}
       {mode === 'scan' && <p style={styles.status}>{status}</p>}
 
-      {/* Detected colors preview */}
+      {/* Detected color swatches grid preview */}
       {lastDetected && (mode === 'solve' || lastDetectedFace === activeFace) && (
         <DetectedPreview
           colors={lastDetected}
@@ -841,7 +886,7 @@ export default function CameraCapture({
         />
       )}
 
-      {/* Controls (Scan mode only) */}
+      {/* Action controls (Scan mode only) */}
       {mode === 'scan' && (
         <div style={styles.controls}>
           <button style={styles.btn} onClick={capture} disabled={scanning}>
@@ -855,7 +900,7 @@ export default function CameraCapture({
         </div>
       )}
 
-      {/* Next step preview (Scan mode only) */}
+      {/* Dynamic guidance indicator for next rotation step (Scan mode only) */}
       {mode === 'scan' && nextInfo && !scanning && (
         <div style={{
           marginTop: '6px', padding: '6px 10px', textAlign: 'center',

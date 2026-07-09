@@ -1,9 +1,12 @@
+// Import React hooks for managing state variables, effects, memoization, callbacks, and element references
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+// Import child components
 import Cube3D from './Cube3D';
 import Cube2D from './Cube2D';
 import ManualEditor from './ManualEditor';
 import CameraCapture from './CameraCapture';
 import SolutionPanel from './SolutionPanel';
+// Import helpers from cube model library
 import { 
   createEmptyState, 
   applyMoves, 
@@ -13,8 +16,10 @@ import {
   COLOR_HEX
 } from '../lib/cube';
 
+// Target URL prefix for Flask REST API server endpoints
 const API_URL = '/api';
 
+// Styling layout variables (CSS-in-JS style objects)
 const s = {
   container: {
     maxWidth: '1200px',
@@ -60,6 +65,7 @@ const s = {
     cursor: 'pointer',
     transition: 'all 200ms ease',
   }),
+  // Main page grid separating navigation controls, canvas viewports, and progress solutions
   mainGrid: {
     display: 'grid',
     gridTemplateColumns: '320px 1fr 300px',
@@ -108,10 +114,13 @@ const s = {
   }
 };
 
+// Panel showing sticker totals to inform the user if the scanned colors layout is physically valid
 function ColorCounts({ cubeState }) {
   const N = cubeState.size;
-  const target = N * N;
+  const target = N * N; // Every standard color must count up to N*N (e.g. 9 for a 3x3)
   const counts = {};
+  
+  // Calculate frequencies of each color in active state
   FACE_NAMES.forEach(f => {
     if (Array.isArray(cubeState[f])) {
       cubeState[f].forEach(color => {
@@ -133,6 +142,7 @@ function ColorCounts({ cubeState }) {
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
+            // Turn border green when color count exactly matches physical target
             border: counts[color] === target ? '1px solid #00b894' : '1px solid var(--border-subtle)',
             color: counts[color] === target ? '#00b894' : 'var(--text-secondary)',
           }}>
@@ -145,22 +155,37 @@ function ColorCounts({ cubeState }) {
   );
 }
 
+// Main CubeApp Container Component
 export default function CubeApp() {
-  /* ── State ─────────────────────────────────────────── */
+  /* ── State variables ─────────────────────────────────── */
+  
+  // Size (N) of the Rubik's cube (defaults to 3)
   const [size, setSize] = useState(3);
+  // Cube colors configuration state
   const [cubeState, setCubeState] = useState(createEmptyState(3));
+  // Solved steps rotation move sequence list
   const [solution, setSolution] = useState([]);
+  // Current active mode ('scan' camera, 'manual' editor, 'solve' tracker, 'visualize' viewport)
   const [inputMode, setInputMode] = useState('manual');
+  // Loading status indicator when solver request is active
   const [solving, setSolving] = useState(false);
+  // Loading status indicator when scramble request is active
   const [scrambling, setScrambling] = useState(false);
+  // System error message text
   const [error, setError] = useState('');
+  // Current step index of solution playback (-1 means initial unsolved state)
   const [playbackStep, setPlaybackStep] = useState(-1);
+  // Keeps the sequence of moves that scrambled the cube (assists perfect solves)
   const [scrambleHistory, setScrambleHistory] = useState([]);
+  // Throttle timer flag during auto-transition steps to prevent double clicks
   const [isTransitioning, setIsTransitioning] = useState(false);
+  // Status flag to pop up the success congratulations modal
   const [showSolvedAnimation, setShowSolvedAnimation] = useState(false);
 
+  // Reference pointer to hold solution playback auto-run setTimeout timers
   const playTimerRef = useRef(null);
 
+  // Clear running auto-run playback timers to avoid memory leaks
   const clearPlayTimer = () => {
     if (playTimerRef.current) {
       clearTimeout(playTimerRef.current);
@@ -168,7 +193,7 @@ export default function CubeApp() {
     }
   };
 
-  // Immediate size change handler
+  // Wipe states and apply updates when cube size configuration slider is moved
   const handleSizeChange = (newSize) => {
     clearPlayTimer();
     setSize(newSize);
@@ -184,20 +209,23 @@ export default function CubeApp() {
     setShowSolvedAnimation(false);
   };
 
-  // Animation state
+  // State parameter representing move being animated in 3D canvas (e.g. 'R')
   const [animatingMove, setAnimatingMove] = useState(null);
+  // Play status flag for auto-run playback
   const [isPlaying, setIsPlaying] = useState(false);
+  // Playback timer delay in ms between consecutive moves (defaults to 400ms)
   const [animSpeed, setAnimSpeed] = useState(400);
-  const [baseState, setBaseState] = useState(null); // State at start of solution
+  // Cube configuration snapshot before starting playback moves
+  const [baseState, setBaseState] = useState(null);
 
-  // Derive current display state based on playback step
+  // Derived state: calculate colors layout configuration based on active step selection
   const displayState = useMemo(() => {
     if (!baseState || playbackStep < 0 || !solution.length) return cubeState;
     const movesToApply = solution.slice(0, playbackStep + 1);
     return applyMoves(cloneState(baseState), movesToApply);
   }, [cubeState, baseState, solution, playbackStep]);
 
-  // Check if color counts are valid
+  // Derived state checking if every single color has exactly N*N stickers
   const isColorCountValid = useMemo(() => {
     const counts = {};
     FACE_NAMES.forEach(f => {
@@ -209,7 +237,9 @@ export default function CubeApp() {
     return COLORS.every(c => counts[c] === N * N);
   }, [cubeState]);
 
-  /* ── Handlers ──────────────────────────────────────── */
+  /* ── Server API Handlers ────────────────────────────── */
+  
+  // Call server scramble endpoint to randomize the cube layout
   async function handleScramble() {
     clearPlayTimer();
     setScrambling(true);
@@ -234,7 +264,9 @@ export default function CubeApp() {
     setScrambling(false);
   }
 
+  // Call server solve endpoint to calculate solution sequence path
   async function handleSolve() {
+    // Return early if color totals are invalid
     if (!isColorCountValid) {
       setError('Invalid state: Check color counts.');
       return;
@@ -254,7 +286,9 @@ export default function CubeApp() {
       if (data.error) {
         setError(data.error);
       } else {
+        // Store solution sequence
         setSolution(data.solution);
+        // Snapshot layout state to calculate playback increments
         setBaseState(cloneState(cubeState));
         setPlaybackStep(-1);
       }
@@ -264,6 +298,7 @@ export default function CubeApp() {
     setSolving(false);
   }
 
+  // Clean and reset all variables to original defaults
   function handleReset() {
     clearPlayTimer();
     setCubeState(createEmptyState(size));
@@ -294,6 +329,7 @@ export default function CubeApp() {
     let maxScore = 0;
     let current = target;
     
+    // Compare face layout at 0, 90, 180, and 270 degrees rotations
     for (let rot = 0; rot < 4; rot++) {
       let score = 0;
       for (let i = 0; i < N * N; i++) {
@@ -312,8 +348,10 @@ export default function CubeApp() {
 
   // Handler for continuous colors detected from the camera during solving
   const handleColorsDetected = useCallback((detectedColors) => {
+    // Skip checking if auto transition, solved popup is open, or solution is empty
     if (isTransitioning || showSolvedAnimation || !baseState || !solution.length) return;
 
+    // Retrieve move index we are trying to complete
     const currentStepIndex = playbackStep + 1; // The move we want to complete
     if (currentStepIndex >= solution.length) return;
 
@@ -368,7 +406,7 @@ export default function CubeApp() {
 
     // 3. Check if the detected colors match the face's target state
     const matchScore = getBestMatchScore(detectedColors, faceColorsAfter, N);
-    const requiredMatches = Math.ceil(0.85 * N * N);
+    const requiredMatches = Math.ceil(0.85 * N * N); // Require 85% match accuracy to trigger
 
     if (matchScore >= requiredMatches) {
       // Match found! Auto-advance.
@@ -376,6 +414,7 @@ export default function CubeApp() {
     }
   }, [playbackStep, solution, baseState, size, isTransitioning, showSolvedAnimation]);
 
+  // Advance playback index when camera detects a rotation was completed by user
   const triggerMoveAdvancement = () => {
     if (isTransitioning) return;
     setIsTransitioning(true);
@@ -383,7 +422,7 @@ export default function CubeApp() {
     setPlaybackStep(prev => {
       const nextStep = prev + 1;
       
-      // If we just completed the last move, show success
+      // If we just completed the last move, show success congratulations popup
       if (nextStep >= solution.length - 1) {
         setShowSolvedAnimation(true);
         setIsPlaying(false);
@@ -398,6 +437,7 @@ export default function CubeApp() {
     }, 500);
   };
 
+  // Triggered when a face camera scan completes
   const handleFaceScanned = useCallback((face, colors) => {
     setCubeState(prev => {
       const next = cloneState(prev);
@@ -407,6 +447,7 @@ export default function CubeApp() {
     setError('');
   }, []);
 
+  // Update playback step index
   const handleStepChange = (step) => {
     clearPlayTimer();
     if (step < -1 || step >= solution.length) return;
@@ -414,6 +455,7 @@ export default function CubeApp() {
     setAnimatingMove(null);
   };
 
+  // Toggle playback auto-run timers
   const togglePlay = () => {
     if (solution.length === 0) return;
     
@@ -424,6 +466,7 @@ export default function CubeApp() {
       
       if (nextIsPlaying) {
         let currentStep = playbackStep;
+        // Loop back to start if we finished the solution sequence
         if (currentStep >= solution.length - 1) {
           currentStep = -1;
           setPlaybackStep(-1);
@@ -443,17 +486,19 @@ export default function CubeApp() {
     });
   };
 
-  // Clean up timer on unmount
+  // Clean up timer on component unmount
   useEffect(() => {
     return () => clearPlayTimer();
   }, []);
 
+  // Callback triggered when 3D rotation animation completes
   const handleAnimationComplete = () => {
     clearPlayTimer();
     
     setPlaybackStep(prev => {
       const nextStep = prev + 1;
       
+      // If playing is active, queue up the next move rotation
       if (isPlaying && nextStep < solution.length - 1) {
         playTimerRef.current = setTimeout(() => {
           setAnimatingMove(solution[nextStep + 1]);
@@ -470,6 +515,7 @@ export default function CubeApp() {
 
   return (
     <div style={s.container}>
+      {/* Page Title Header and Nav Tabs */}
       <header style={s.header}>
         <h1 style={s.title}>Rubik's Cube <span style={{ color: 'var(--text-primary)', fontWeight: '400' }}>Solver</span></h1>
         
@@ -481,6 +527,7 @@ export default function CubeApp() {
             <button style={s.navBtn(inputMode === 'visualize')} onClick={() => setInputMode('visualize')}>Visualize</button>
           </div>
 
+          {/* Size slider bar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
             <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--accent-primary)', textTransform: 'uppercase' }}>Size:</span>
             <input 
@@ -495,8 +542,9 @@ export default function CubeApp() {
         </div>
       </header>
 
+      {/* Main Grid split into 3 panels */}
       <main style={s.mainGrid}>
-        {/* Left Panel: Inputs */}
+        {/* Left Side: Input Panel (Camera scan, Paint editor, or Auto-Step solver feeds) */}
         <section style={{ ...s.panel, overflowY: 'auto', maxHeight: 'calc(100vh - 160px)' }}>
           <div style={s.badge}>Input Method</div>
           
@@ -554,6 +602,7 @@ export default function CubeApp() {
             </div>
           )}
 
+          {/* Trigger Solve controls */}
           {((inputMode === 'manual' || inputMode === 'solve') && solution.length === 0) && (
             <>
               <ColorCounts cubeState={cubeState} />
@@ -568,6 +617,7 @@ export default function CubeApp() {
             </>
           )}
 
+          {/* Scramble and Reset controls */}
           <button 
             style={s.button('secondary')} 
             onClick={handleScramble}
@@ -583,6 +633,7 @@ export default function CubeApp() {
             ↺ Reset
           </button>
 
+          {/* Error notifications */}
           {error && (
             <div style={{ 
               marginTop: '16px', padding: '12px', borderRadius: '10px', 
@@ -594,8 +645,9 @@ export default function CubeApp() {
           )}
         </section>
 
-        {/* Center Panel: Viewport */}
+        {/* Center Panel: Viewport visualizers */}
         <section style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* 3D Visualizer Canvas container */}
           <div style={{ ...s.panel, height: '480px', padding: 0, position: 'relative' }}>
             <div style={{ position: 'absolute', top: '16px', left: '16px', zIndex: 1, display: 'flex', gap: '8px' }}>
               <div style={s.badge}>💎 Cube View</div>
@@ -611,6 +663,7 @@ export default function CubeApp() {
             />
           </div>
 
+          {/* 2D Unfolded Grid container */}
           <div style={{ ...s.panel, padding: '12px' }}>
             <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '8px' }}>
               2D Unfolded View ({size}x{size})
@@ -622,7 +675,7 @@ export default function CubeApp() {
           </div>
         </section>
 
-        {/* Right Panel: Solution */}
+        {/* Right Side: Solution navigation list and step descriptions */}
         <section style={s.panel}>
           <div style={s.badge}>📜 Solution</div>
           <SolutionPanel 
@@ -640,7 +693,7 @@ export default function CubeApp() {
         </section>
       </main>
 
-      {/* Solved Success Overlay Modal */}
+      {/* Solved Success Congratulations Modal Popup */}
       {showSolvedAnimation && (
         <div style={{
           position: 'fixed',
@@ -678,7 +731,7 @@ export default function CubeApp() {
               lineHeight: '1.6',
               margin: '0 0 28px 0'
             }}>
-              Congratulations! The camera detected the final solved state. Every rotation has been completed successfully.
+              Congratulations! Every rotation has been completed successfully. The cube is now fully solved.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <button
