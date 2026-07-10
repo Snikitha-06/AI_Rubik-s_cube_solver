@@ -45,6 +45,17 @@ export function createEmptyState(N = 3) {
     if (N % 2 === 1) {
       const centerIdx = Math.floor((N * N) / 2);
       state[face][centerIdx] = COLORS[i];
+    } else {
+      const half = N / 2;
+      const indices = [
+        (half - 1) * N + (half - 1),
+        (half - 1) * N + half,
+        half * N + (half - 1),
+        half * N + half
+      ];
+      indices.forEach(idx => {
+        state[face][idx] = COLORS[i];
+      });
     }
   });
   return state;

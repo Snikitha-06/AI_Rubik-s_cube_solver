@@ -193,11 +193,127 @@ export default function CubeApp() {
     }
   };
 
+  // Toast notifications list
+  const [toasts, setToasts] = useState([]);
+
+  // Helper to show a temporary toast message
+  const showToast = useCallback((message) => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev, { id, message }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000); // Expose toast for 4 seconds
+  }, []);
+
+  // Centralized function to validate and paint stickers
+  const validateAndPaintStickers = useCallback((updatesOrFace, indexOrIsFull = false, newColor = null) => {
+    let updates = [];
+    let isFullState = false;
+
+    if (typeof updatesOrFace === 'string') {
+      // Single sticker update: validateAndPaintStickers(face, index, newColor)
+      updates = [{ face: updatesOrFace, index: indexOrIsFull, color: newColor }];
+      isFullState = false;
+    } else {
+      // Batch or full update: validateAndPaintStickers(updates, isFullState)
+      updates = updatesOrFace;
+      isFullState = indexOrIsFull;
+    }
+
+    let toastMessage = null;
+    let isValid = true;
+    let nextState;
+
+    if (isFullState) {
+      const counts = {};
+      const target = (updates.size || size) * (updates.size || size);
+
+      for (const face of FACE_NAMES) {
+        if (Array.isArray(updates[face])) {
+          for (const color of updates[face]) {
+            if (COLORS.includes(color)) {
+              counts[color] = (counts[color] || 0) + 1;
+              if (counts[color] > target) {
+                isValid = false;
+                toastMessage = `${color.charAt(0).toUpperCase() + color.slice(1)} already has all ${target} stickers assigned.`;
+                break;
+              }
+            }
+          }
+        }
+        if (!isValid) break;
+      }
+
+      if (isValid) {
+        nextState = updates;
+      }
+    } else {
+      nextState = cloneState(cubeState);
+      const target = nextState.size * nextState.size;
+
+      const getCounts = (state) => {
+        const counts = {};
+        FACE_NAMES.forEach(f => {
+          state[f]?.forEach(color => {
+            if (COLORS.includes(color)) {
+              counts[color] = (counts[color] || 0) + 1;
+            }
+          });
+        });
+        return counts;
+      };
+
+      let counts = getCounts(nextState);
+
+      for (const update of updates) {
+        const { face, index, color: newColor } = update;
+        const oldColor = nextState[face][index];
+
+        if (oldColor === newColor) continue;
+
+        if (COLORS.includes(newColor)) {
+          const currentCount = counts[newColor] || 0;
+          if (currentCount >= target) {
+            isValid = false;
+            toastMessage = `${newColor.charAt(0).toUpperCase() + newColor.slice(1)} already has all ${target} stickers assigned.`;
+            break; // Cancel the entire batch update completely!
+          }
+        }
+
+        // Apply simulated change and update counters for subsequent checks in this batch
+        nextState[face][index] = newColor;
+        if (COLORS.includes(oldColor)) {
+          counts[oldColor] = Math.max(0, (counts[oldColor] || 0) - 1);
+        }
+        if (COLORS.includes(newColor)) {
+          counts[newColor] = (counts[newColor] || 0) + 1;
+        }
+      }
+    }
+
+    if (isValid) {
+      setCubeState(nextState);
+      setSolution([]);
+      setPlaybackStep(-1);
+      setBaseState(null);
+      setScrambleHistory([]);
+    } else if (toastMessage) {
+      showToast(toastMessage);
+    }
+  }, [size, cubeState, showToast]);
+
+  // Convenience wrapper helper
+  const updateSticker = useCallback((face, index, newColor) => {
+    validateAndPaintStickers(face, index, newColor);
+  }, [validateAndPaintStickers]);
+
+
+
   // Wipe states and apply updates when cube size configuration slider is moved
   const handleSizeChange = (newSize) => {
     clearPlayTimer();
     setSize(newSize);
-    setCubeState(createEmptyState(newSize));
+    validateAndPaintStickers(createEmptyState(newSize), true);
     setSolution([]);
     setPlaybackStep(-1);
     setBaseState(null);
@@ -255,7 +371,7 @@ export default function CubeApp() {
       const res = await fetch(`${API_URL}/scramble?size=${size}`);
       const data = await res.json();
       if (data.state) {
-        setCubeState({ ...data.state, size });
+        validateAndPaintStickers({ ...data.state, size }, true);
         if (data.scramble) setScrambleHistory(data.scramble);
       }
     } catch {
@@ -301,7 +417,7 @@ export default function CubeApp() {
   // Clean and reset all variables to original defaults
   function handleReset() {
     clearPlayTimer();
-    setCubeState(createEmptyState(size));
+    validateAndPaintStickers(createEmptyState(size), true);
     setSolution([]);
     setPlaybackStep(-1);
     setBaseState(null);
@@ -439,13 +555,10 @@ export default function CubeApp() {
 
   // Triggered when a face camera scan completes
   const handleFaceScanned = useCallback((face, colors) => {
-    setCubeState(prev => {
-      const next = cloneState(prev);
-      next[face] = colors;
-      return next;
-    });
+    const updates = colors.map((color, index) => ({ face, index, color }));
+    validateAndPaintStickers(updates);
     setError('');
-  }, []);
+  }, [validateAndPaintStickers]);
 
   // Update playback step index
   const handleStepChange = (step) => {
@@ -555,7 +668,7 @@ export default function CubeApp() {
           {inputMode === 'manual' && (
             <ManualEditor 
               cubeState={cubeState} 
-              onStateChange={setCubeState} 
+              onStickerUpdate={validateAndPaintStickers} 
             />
           )}
 
@@ -638,9 +751,15 @@ export default function CubeApp() {
             <div style={{ 
               marginTop: '16px', padding: '12px', borderRadius: '10px', 
               background: 'rgba(255, 107, 107, 0.1)', color: '#ff7675', fontSize: '12px',
-              border: '1px solid rgba(255, 107, 107, 0.2)'
+              border: '1px solid rgba(255, 107, 107, 0.2)',
+              lineHeight: '1.4'
             }}>
-              ⚠️ {error}
+              <div style={{ fontWeight: '700' }}>⚠️ {error}</div>
+              {(error.includes("edges") || error.includes("corners") || error.includes("Twist") || error.includes("Flip") || error.includes("Parity")) ? (
+                <div style={{ marginTop: '8px', fontSize: '11px', color: 'rgba(255, 255, 255, 0.7)', borderTop: '1px solid rgba(255, 107, 107, 0.2)', paddingTop: '8px' }}>
+                  <strong>💡 Tip:</strong> This error usually means some face(s) were entered in the wrong orientation. Open the <strong>Edit</strong> tab and check the <strong>Orientation Helper</strong> to verify how your physical cube should align.
+                </div>
+              ) : null}
             </div>
           )}
         </section>
@@ -763,6 +882,44 @@ export default function CubeApp() {
           </div>
         </div>
       )}
+
+      {/* Toast Notifications */}
+      <div style={{
+        position: 'fixed',
+        top: '24px',
+        right: '24px',
+        zIndex: 10000,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+        pointerEvents: 'none',
+      }}>
+        {toasts.map(t => (
+          <div key={t.id} style={{
+            background: 'rgba(255, 107, 107, 0.15)',
+            border: '1px solid rgba(255, 107, 107, 0.3)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            color: '#ff7675',
+            padding: '14px 24px',
+            borderRadius: '16px',
+            fontSize: '13px',
+            fontWeight: '700',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            animation: 'slideIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            pointerEvents: 'auto',
+            minWidth: '280px',
+            maxWidth: '360px',
+            fontFamily: 'var(--font-sans)',
+          }}>
+            <span style={{ fontSize: '16px' }}>⚠️</span>
+            <span>{t.message}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

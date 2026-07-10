@@ -68,5 +68,38 @@ class TestSolverValidation(unittest.TestCase):
         self.assertFalse(valid)
         self.assertIn("must have unique colors", msg)
 
+    def test_solve_prefers_kociemba_over_history_for_3x3(self):
+        # Scramble a 3x3 cube
+        state = cube_solver.create_solved_state(3)
+        scramble = ["R", "U", "R'", "U'"]
+        for m in scramble:
+            state = cube_solver.apply_move(state, m, 3)
+            
+        # Pass a dummy history that does not solve the cube.
+        # If solver uses history, it will return ["U'"].
+        # If solver uses Kociemba, it will find a solution that solves the cube.
+        solution = cube_solver.solve(state, 3, history=["U"])
+        self.assertNotEqual(solution, ["U'"])
+        
+        # Apply the solution to verify it actually solves the cube
+        temp_state = state
+        for m in solution:
+            temp_state = cube_solver.apply_move(temp_state, m, 3)
+        
+        # Verify it is solved
+        for face in cube_solver.FACES:
+            first_color = temp_state[face][0]
+            self.assertTrue(all(c == first_color for c in temp_state[face]))
+
+    def test_solve_large_manual_raises_value_error(self):
+        # Create a manually edited 4x4 state (no history)
+        state = cube_solver.create_solved_state(4)
+        state = cube_solver.apply_move(state, "R", 4)
+        
+        # Solving without history should raise ValueError with restriction message
+        with self.assertRaises(ValueError) as context:
+            cube_solver.solve(state, 4, history=None)
+        self.assertIn("Manual solving is only supported for 3x3x3 cubes", str(context.exception))
+
 if __name__ == '__main__':
     unittest.main()

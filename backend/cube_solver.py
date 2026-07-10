@@ -180,11 +180,7 @@ def solve(state, N=3, history=None):
     if is_solved:
         return []
 
-    # 1. If we have a move history (e.g., scramble sequence), solve by reverting moves in reverse order
-    if history and len(history) > 0:
-        return [invert_move(m) for m in reversed(history)]
-
-    # 2. If it's a standard 3x3, solve optimally using the Kociemba library
+    # 1. If it's a standard 3x3, solve optimally using the Kociemba library
     if N == 3:
         # Create a mapping of center sticker color to face letter
         mapping = {state[f][4]: f for f in FACES}
@@ -222,18 +218,12 @@ def solve(state, N=3, history=None):
                 if isinstance(py_err, ValueError):
                     raise py_err
                 raise ValueError("Error. Probably cubestring is invalid.")
-    
-    # 3. Fallback for larger NxN manual inputs: generate a reduction sequence
-    # For large cubes, we generate a random sequence to demonstrate how inner layer moves are written.
-    res = []
-    faces = ['U', 'D', 'L', 'R', 'F', 'B']
-    # Create sequence of sample moves to return
-    for i in range(min(120, N * 5)):
-        f = random.choice(faces)
-        l = random.randint(1, N//2)
-        res.append(f"{l if l>1 else ''}{f}")
-        res.append(f"{l if l>1 else ''}{f}'")
-    return res if res else ["U", "D", "L", "R", "F", "B"]
+
+    # 2. If we have a move history (e.g., scramble sequence) for larger cubes, solve by reverting moves in reverse order
+    if history and len(history) > 0:
+        return [invert_move(m) for m in reversed(history)]
+    # 3. Raise error for larger manual inputs
+    raise ValueError(f"Manual solving is only supported for 3x3x3 cubes. For {N}x{N}x{N} cubes, please use Scramble.")
 
 # Helper to validate center sticker colors and relative 3D coordinate chirality
 def _validate_centers_chirality(state, N):

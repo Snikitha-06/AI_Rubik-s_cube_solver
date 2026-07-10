@@ -3,6 +3,39 @@ import { useState } from 'react';
 // Import face keys, standard colors list, and hex codes mapping from cube library
 import { FACE_NAMES, COLORS, COLOR_HEX } from '../lib/cube';
 
+function isCenterSticker(idx, N) {
+  if (N % 2 === 1) {
+    return idx === Math.floor((N * N) / 2);
+  } else {
+    const half = N / 2;
+    const indices = [
+      (half - 1) * N + (half - 1),
+      (half - 1) * N + half,
+      half * N + (half - 1),
+      half * N + half
+    ];
+    return indices.includes(idx);
+  }
+}
+
+const ADJACENT_FACES = {
+  U: { top: 'B', bottom: 'F', left: 'L', right: 'R' },
+  D: { top: 'F', bottom: 'B', left: 'L', right: 'R' },
+  F: { top: 'U', bottom: 'D', left: 'L', right: 'R' },
+  B: { top: 'U', bottom: 'D', left: 'R', right: 'L' },
+  R: { top: 'U', bottom: 'D', left: 'F', right: 'B' },
+  L: { top: 'U', bottom: 'D', left: 'B', right: 'F' }
+};
+
+const FACE_COLORS_NAMES = {
+  U: 'white',
+  D: 'yellow',
+  F: 'green',
+  B: 'blue',
+  R: 'red',
+  L: 'orange'
+};
+
 // Inline styling config for UI components
 const styles = {
   // Main card container layout
@@ -107,7 +140,7 @@ const styles = {
 };
 
 // Main ManualEditor Component
-export default function ManualEditor({ cubeState, onStateChange }) {
+export default function ManualEditor({ cubeState, onStickerUpdate }) {
   const size = cubeState.size || 3;
   // State tracking the currently selected paint color (defaults to white)
   const [selectedColor, setSelectedColor] = useState('white');
@@ -116,46 +149,32 @@ export default function ManualEditor({ cubeState, onStateChange }) {
 
   // Triggered when a grid sticker is clicked: updates color of that single sticker
   const handleStickerClick = (face, idx) => {
-    // Prevent modifying the center sticker on odd-sized cubes
-    if (size % 2 === 1 && idx === Math.floor((size * size) / 2)) {
+    // Prevent modifying the center sticker
+    if (isCenterSticker(idx, size)) {
       return;
     }
-    // Clone the cube state dictionary
-    const newState = { ...cubeState };
-    // Clone the specific face stickers array to update in place
-    newState[face] = [...newState[face]];
-    // Paint sticker index with the selected color
-    newState[face][idx] = selectedColor;
-    // Callback to parent component with new layout state
-    onStateChange(newState);
+    // Delegate to the centralized updater
+    onStickerUpdate([{ face, index: idx, color: selectedColor }]);
   };
 
   // Paint all stickers of the currently active face with the selected color (keeping center color)
   const fillFace = () => {
-    const newState = { ...cubeState };
-    if (size % 2 === 1) {
-      const centerIdx = Math.floor((size * size) / 2);
-      const centerColor = newState[activeFace][centerIdx];
-      newState[activeFace] = Array(size * size).fill(selectedColor);
-      newState[activeFace][centerIdx] = centerColor;
-    } else {
-      newState[activeFace] = Array(size * size).fill(selectedColor);
+    const updates = [];
+    for (let i = 0; i < size * size; i++) {
+      if (isCenterSticker(i, size)) continue; // Keep center color
+      updates.push({ face: activeFace, index: i, color: selectedColor });
     }
-    onStateChange(newState);
+    onStickerUpdate(updates);
   };
 
   // Clear all stickers of the currently active face to gray (keeping center color)
   const clearFace = () => {
-    const newState = { ...cubeState };
-    if (size % 2 === 1) {
-      const centerIdx = Math.floor((size * size) / 2);
-      const centerColor = newState[activeFace][centerIdx];
-      newState[activeFace] = Array(size * size).fill('gray');
-      newState[activeFace][centerIdx] = centerColor;
-    } else {
-      newState[activeFace] = Array(size * size).fill('gray');
+    const updates = [];
+    for (let i = 0; i < size * size; i++) {
+      if (isCenterSticker(i, size)) continue; // Keep center color
+      updates.push({ face: activeFace, index: i, color: 'gray' });
     }
-    onStateChange(newState);
+    onStickerUpdate(updates);
   };
 
   return (
@@ -189,11 +208,48 @@ export default function ManualEditor({ cubeState, onStateChange }) {
         ))}
       </div>
 
+      {/* Dynamic Orientation Helper */}
+      <div style={{
+        padding: '10px',
+        background: 'var(--bg-secondary)',
+        borderRadius: '8px',
+        border: '1px solid var(--border-subtle)',
+        fontSize: '11px',
+        marginBottom: '12px',
+        color: 'var(--text-secondary)'
+      }}>
+        <div style={{ fontWeight: '800', color: 'var(--accent-primary)', marginBottom: '8px', textTransform: 'uppercase', fontSize: '9px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          🗺️ Orientation Helper (Face: {activeFace})
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Top:</span>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLOR_HEX[FACE_COLORS_NAMES[ADJACENT_FACES[activeFace].top]] }} />
+            <span style={{ fontFamily: 'var(--font-mono)' }}>{ADJACENT_FACES[activeFace].top}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Right:</span>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLOR_HEX[FACE_COLORS_NAMES[ADJACENT_FACES[activeFace].right]] }} />
+            <span style={{ fontFamily: 'var(--font-mono)' }}>{ADJACENT_FACES[activeFace].right}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Bottom:</span>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLOR_HEX[FACE_COLORS_NAMES[ADJACENT_FACES[activeFace].bottom]] }} />
+            <span style={{ fontFamily: 'var(--font-mono)' }}>{ADJACENT_FACES[activeFace].bottom}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Left:</span>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLOR_HEX[FACE_COLORS_NAMES[ADJACENT_FACES[activeFace].left]] }} />
+            <span style={{ fontFamily: 'var(--font-mono)' }}>{ADJACENT_FACES[activeFace].left}</span>
+          </div>
+        </div>
+      </div>
+
       {/* Render active face grid details and click targets */}
       <div style={styles.label}>Face: {activeFace} ({size}x{size})</div>
       <div style={styles.faceGrid(size)}>
         {cubeState[activeFace]?.map((color, idx) => {
-          const isCenter = size % 2 === 1 && idx === Math.floor((size * size) / 2);
+          const isCenter = isCenterSticker(idx, size);
           return (
             <div
               key={idx}
